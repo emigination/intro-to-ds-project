@@ -1,23 +1,21 @@
 import numpy as np
 import pandas as pd
-import seaborn as sb
+import seaborn as so
 
-# temperatures = np.loadtxt('temperatures.txt')
-# precipitations = np.loadtxt('precipitations.txt')
-# windSpeeds = np.loadtxt('wind_speeds.txt')
+temperatures = np.loadtxt('temperatures.txt')
+precipitations = np.loadtxt('precipitations.txt')
+windSpeeds = np.loadtxt('wind_speeds.txt')
 
-year = 2021
-months = range(4, 11)
-monthlyTrips = []
-for month in months:
-  if month < 10:
-    monthString = '0'+ str(month)
-  else:
-    monthString = str(month)
-  infile = open('data/od-trips-'+ str(year) + '/2021-'+monthString+'.csv', 'r')
-  df = pd.read_csv(infile, sep=',')
-  infile.close()
-  monthlyTrips.append(df)
-allTrips = pd.concat(monthlyTrips)
-allTrips.sort_values(by=['Departure'], inplace=True, ignore_index=True)
-allTrips['Date'] = pd.to_datetime(allTrips['Departure'], format='ISO8601').dt.date
+trips = pd.read_csv('daily_trips.csv')
+
+# so.scatterplot(x=temperatures, y=trips['Trips']).figure.savefig('trips_vs_temperature.png')
+# so.scatterplot(x=precipitations, y=trips['Trips']).figure.savefig('trips_vs_precipitation.png')
+# so.scatterplot(x=windSpeeds, y=trips['Trips']).figure.savefig('trips_vs_wind_speed.png')
+
+precipitationsBoolean = [True if precipitation > 0 else False for precipitation in precipitations]
+so.scatterplot(x=temperatures, y=trips['Trips'], hue=precipitationsBoolean).figure.savefig('trips_vs_temperature_and_precipitation.png')
+
+print('Correlation coefficient between trips and temperature:', np.corrcoef(temperatures, trips['Trips'])[0,1])
+print('Correlation coefficient between trips and precipitation:', np.corrcoef(precipitations, trips['Trips'])[0,1])
+print('Correlation coefficient between trips and wind speed:', np.corrcoef(windSpeeds, trips['Trips'])[0,1])
+print('Correlation coefficient between trips and rain:', np.corrcoef(precipitationsBoolean, trips['Trips'])[0,1])

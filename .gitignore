@@ -1,2 +1,4 @@
-*.txt
 data/
+*.txt
+*.csv
+*.png
