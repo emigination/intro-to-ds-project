@@ -1,18 +1,25 @@
 import numpy as np
 from fmiopendata.wfs import download_stored_query
 import datetime as dt
-data = download_stored_query("fmi::observations::weather::daily::multipointcoverage", ["place=Helsinki", "starttime=2021-01-01", "endtime=2021-12-31"]).data
-dates = sorted(list(data.keys()))
-weatherByDay = {}
+
+year = 2021
+startMonth = 4
+endMonth = 10
+startDate = dt.datetime(year, startMonth, 1) - dt.timedelta(days=1)
+startTime = startDate.strftime('%Y-%m-%d') + "T00:00:00Z"
+endTime = (dt.datetime(year, endMonth+1, 1)).strftime('%Y-%m-%d')  + "T23:59:59Z"
+
+data = download_stored_query("fmi::observations::weather::daily::multipointcoverage", ["place=Helsinki", "starttime="+startTime, "endtime="+endTime]).data
+dateTimes = [dateTime for dateTime in list(data.keys()) if dateTime.strftime('%H') == '00']
+dateTimes.sort()
 weatherList = []
-for date in dates:
-  weatherByDay[date] = data[date]['Helsinki Kaisaniemi']
-  weatherList.append(data[date]['Helsinki Kaisaniemi'])
+for dateTime in dateTimes:
+  weatherList.append(data[dateTime]['Helsinki Kaisaniemi'])
 
 temperatures = []
 precipitations = []
-for i, daysWeather in enumerate(weatherList):
-  temperature = daysWeather['Air temperature']['value']
+for i in range(1, len(weatherList)-1):
+  temperature = weatherList[i]['Air temperature']['value']
   if np.isnan(temperature):
     previous = weatherList[i-1]['Air temperature']['value']
     following = weatherList[i+1]['Air temperature']['value']
@@ -21,13 +28,18 @@ for i, daysWeather in enumerate(weatherList):
     elif np.isnan(following):
       temperatures.append(previous)
     else:
-      temperature = (weatherList[i-1]['Air temperature']['value'] + weatherList[i+1]['Air temperature']['value'])/2
+      temperature = (previous + following)/2
   else:
     temperatures.append(temperature)
-  precipitation = daysWeather['Precipitation amount']['value']
+
+  precipitation = weatherList[i]['Precipitation amount']['value']
   if precipitation == -1:
     precipitation = 0
   precipitations.append(precipitation)
+
+outfile = open('temperatures.txt', 'w')
+outfile.writelines([str(i)+'\n' for i in temperatures])
+outfile.close()
 
 imputedPrecipitations = precipitations.copy()
 for i, precipitation in enumerate(precipitations):
@@ -41,4 +53,31 @@ for i, precipitation in enumerate(precipitations):
     else:
       imputedPrecipitations[i] = (previous + following)/2
 
-print(imputedPrecipitations)
+outfile = open('precipitations.txt', 'w')
+outfile.writelines([str(i)+'\n' for i in imputedPrecipitations])
+outfile.close()
+
+meanWindSpeeds = []
+for month in range(startMonth, endMonth+1):
+  startDate = dt.datetime(year, month, 1)
+  startTime = startDate.strftime('%Y-%m-%d') + "T00:00:00Z"
+  endTime = (dt.datetime(year, month+1, 1) - dt.timedelta(days=1)).strftime('%Y-%m-%d')  + "T23:59:59Z"
+  monthlyData = download_stored_query("fmi::observations::weather::hourly::multipointcoverage", ["place=Helsinki", "starttime="+startTime, "endtime="+endTime]).data
+  currentDate = startDate
+  daysWindSpeeds = []
+  for time in sorted(monthlyData.keys()):
+    windSpeed = monthlyData[time]['Helsinki Kaisaniemi']['Wind speed']['value']
+    if np.isnan(windSpeed):
+      continue
+
+    if time.strftime('%Y-%m-%d') == currentDate.strftime('%Y-%m-%d'):
+      daysWindSpeeds.append(windSpeed)
+    else:
+      meanWindSpeeds.append(np.mean(daysWindSpeeds))
+      currentDate += dt.timedelta(days=1)
+      daysWindSpeeds = [windSpeed]
+  meanWindSpeeds.append(np.mean(daysWindSpeeds))
+
+outfile = open('wind_speeds.txt', 'w')
+outfile.writelines([str(i)+'\n' for i in meanWindSpeeds])
+outfile.close()
